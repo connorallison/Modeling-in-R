@@ -1,0 +1,174 @@
+---
+title: "Practice 2"
+author: "Connor Allison fbu535"
+date: "`r Sys.Date()`"
+output:
+  pdf_document:
+    keep_tex: true
+  html_document:
+    df_print: paged
+header-includes:
+- \usepackage{fancyhdr}
+- \pagestyle{fancy}
+- \fancyhead[R]{fbu535}
+- \fancyhead[L]{Connor Allison}
+- \fancyfoot[C]{\thepage}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(car)
+library(DescTools)
+library(visreg)
+library(ggpubr)
+library(performance)
+library(olsrr)
+library(ResourceSelection)
+```
+
+```{r}
+birth = read_csv("birthweight_final.csv")
+```
+
+
+Problem 1: perform four model selection methods. 
+
+I have removed Weight_Gr because is in another measure of weight
+```{r}
+model1a = lm(Weight ~ .-Weight_Gr, data = birth)
+summary(model1a)
+```
+
+Stepwise:
+```{r}
+stepwise1a = ols_step_best_subset(model1a, pent = .01, prem = .01, details = F)
+stepwise1a
+```
+I used the ols_step_best_subset in order to be able to specify the p-value cut off for entry and removal. According to the AIC criteria the best model includes Black, Boy, MomSmoke, Ed, and MomWtGain as predictors. Although the AIC for the model with Black, Boy, MomSmoke, and MomWtGain as predictors is just slightly higher, I think it is a better model because it doesn't require us to waste time considering Ed. 
+
+Forward:
+```{r}
+forward1a = ols_step_forward_p(model1a, p_val = 0.01)
+forward1a
+```
+I used the ols_step_forward_p in order to be able to specify the p-value cut off for entry. According to the forward selection method the best model includes Black, MomSmoke, and MomWtGain as predictors. 
+
+Backward:
+```{r}
+backward1a = ols_step_backward_p(model1a, p_val = 0.01)
+backward1a
+```
+I used the ols_step_backward_p in order to be able to specify the p-value cut off for entry. According to the forward selection method the best model includes Black, MomSmoke, and MomWtGain as predictors. 
+
+Adj R-Squared:
+```{r, include=FALSE}
+adj1a = ols_step_all_possible(model1a)
+which(adj1a[["result"]][["adjr"]] > .131)
+adj1a
+```
+I first did it manually by looking at all possible combinations of predictors. Making a list of all the adj R-Squared and finding the highest one. The looking at what combination of predictors achieved this result. According to this method, the best predictors are Black, Married, Boy, MomSmoke, Ed, MomWtGain.
+
+```{r}
+adj1b = ols_step_both_adj_r2(model1a)
+adj1b
+```
+
+Running a model using Adj R-Square as the criteria we see the best predictors are Black, Married, Boy, MomSmoke, Ed, MomWtGain.
+
+b.
+```{r}
+par(mfrow = c(2,2))
+plot(model1a)
+```
+
+```{r}
+model1b = lm(Weight ~ Black + Boy + MomSmoke + MomWtGain, data = birth)
+cooks1 = cooks.distance(model1b)
+inf.cooks = which(cooks1 > 0.115)
+plot(model1b, which = 4)
+```
+None of the points have cooks values above 0.115 so we are not adjusting our model. We still have all 400 observations in our model. 
+
+```{r}
+summary(model1b)$adj.r.squared
+```
+Roughly 12.8% of variation in weight is explained by our model. 
+
+```{r}
+summary(model1b)
+```
+For the categorical predictors Black and Momsmoke, we see a negative correlation with Weight. For Boys we see a positive correlation with Weight. Finally, for every unit of weight the mom gains the infant can expect to gain about 12 grams. 
+
+Problem 2: 
+```{r}
+model2a = glm(Weight_Gr ~ .-Weight, data = birth, family = binomial)
+summary(model2a)
+```
+Best stepwise model using AIC criteria.
+```{r}
+summary(step(model2a, direction = "both"))
+```
+
+```{r}
+summary(step(model2a, k = log(nrow(birth))))
+```
+a. 
+The BIC criteria yields a model with MomSmoke, MomAge, and MomWtGain while the AIC criteria yields a model with Boy, Ed, MomSmoke, MomAge, and MomWtGain. The AIC version includes all predictors found in the BIC version with the addition of Boy and Ed. 
+
+b.
+```{r}
+model2b = glm(formula = Weight_Gr ~ MomSmoke + MomAge + MomWtGain, family = binomial, data = birth)
+summary(model2b)
+```
+
+```{r}
+model2b = glm(Weight_Gr ~ MomSmoke + MomAge + MomWtGain, data = birth, family = "binomial")
+cooks2 = cooks.distance(model2b)
+inf.cooks2 = which(cooks2 > 0.1)
+plot(model2b, which = 4)
+inf.cooks2
+```
+We do not remove any points and still have 400 observations. 
+
+c. 
+```{r}
+OR=exp(model2b$coefficients)
+round(OR, 3)
+```
+From the odds ratios we can conclude that moms who smoke are 2.377 times more likely to have a low birthweight baby than a mom how doesn't smoke. For every unit of MomAge increase and MomWtGain the odds of having a low weight baby decrease by 0.953times and 0.964times respectively. 
+
+d. Women who smoke, are older and don't gain very much weight during pregnancy are the most likely to have low birthweight babies. 
+
+e. 
+```{r}
+prob = mean(birth$Weight_Gr)
+prob
+```
+The probability of low birth weight infants is 49.25%
+
+f. 
+```{r, include=FALSE}
+fit.prob <- predict(model2b, type = "response")
+pred.class.1 <- ifelse(fit.prob > prob, 1, 0)
+cbind(fit.prob, pred.class.1)
+```
+
+
+```{r}
+mean(birth$Weight_Gr != pred.class.1)
+```
+Our misclassification rate is 35.5%
+
+g. 
+```{r}
+HosmerLemeshowTest(fitted(model2b), birth$Weight_Gr)$C
+```
+A p-value greater than .05 indicates adequate fit. 
+
+
+Problem 3: 
+Our results from problem one suggest that Black, Boy, MomSmoke and MomWtGain are all significant predictors for birthweight. On the other hand, our model in problem two suggests that MomSmoke, MomAge and MomWtGain are significant predictors for birthweight. Both models suggest that MomSmoke and MomWtGain are important predictors. Fortunately, they are also the predictors that women have more control over. 
+
+If I were to implement a low birth weight prevention program, I would strongly encourage that those who want to become pregnant refrain from smoking and eat healthy to maintain/gain weight during their pregnancy. There is also an age component that influences birth weight. Women should avoid having children too young to avoid low birth weight.  
+

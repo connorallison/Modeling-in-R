@@ -1,0 +1,182 @@
+---
+title: "Practice 1"
+author: "Connor Allison fbu535"
+date: "`r Sys.Date()`"
+output: 
+  pdf_document:
+    keep_tex: true
+header-includes:
+   - \usepackage{fancyhdr}
+   - \pagestyle{fancy}
+   - \fancyhead[R]{fbu535}
+   - \fancyhead[L]{Connor Allison}
+   - \fancyfoot[C]{\thepage}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(car)
+library(DescTools)
+```
+
+We will be using the birthweight.csv data set.
+
+Import the data set
+
+```{r}
+birthweight = read.csv("birthweight.csv")
+```
+
+##Problem 1
+
+a. Generate Boxplot for infant birth weight (Weight) and comment on the general features of the distribution. Generate a normal QQ-plot and perform the Shapiro-wilk test to check whether normality is a reasonable assumption for Weight. Make a conclusion.
+
+```{r}
+boxplot(birthweight$Weight)
+```
+The boxplot indicates that infant weight is normally distributed. Most of the data is centered around the median and there are a few outliers. 
+
+```{r}
+qqnorm(birthweight$Weight)
+qqline(birthweight$Weight, col = "red")
+```
+
+```{r}
+shapiro.test(birthweight$Weight)
+```
+
+The Q-Q plot suggest that the data is normally distributed. This is confirmed when we run the Shapiro-Wilk test and get a p-value (0.1153) above 0.05 failing to reject the null hypothesis that the data is normally distributed. In conclusion, the infant weight data is normally distributed. 
+
+b. Generate a boxplot of Weight by MomSmoke and compare infant birth weights between smoking levels.
+
+```{r}
+boxplot(Weight ~ MomSmoke, data = birthweight)
+```
+
+From the boxplot, non-smoking moms seem to have heavier infants than smoking moms. 
+
+c. For each level in MomSmoke, perform the Shapiro-wilk test to check the Normality of Weight. Make a conclusion.
+
+```{r}
+shapiro.test(birthweight$Weight[birthweight$MomSmoke == 0])
+shapiro.test(birthweight$Weight[birthweight$MomSmoke == 1])
+```
+
+The Shapiro-Wilk test for both non-smoking and smoking moms yield p-values (0.3549 and 0.2 respectively) above 0.05 failing to reject the null hypothesis that the data is normally distributed. In conclusion, the infant weight data is normally distributed in both MomSmoke groups. 
+
+
+##Problem 2
+
+We want to test if there is a significant difference in birth weights between infants from smoking moms and non-smoking moms.
+
+a. Perform a hypothesis test of whether infants from smoking moms have different weights than infants from non-smoking moms. Which test do you choose? Use the answer in Exercise 1 to choose the proper test. Specify null and alternative hypotheses and state your conclusion
+
+NOTE: If you decide to use the parametric test, perform a two-sample t-test rather than ANOVA.
+
+In Exercise 1 we concluded that the data is normally distributed. Now we must check to see if the two groups have equal variances. The null hypothesis is they have the same variance and the alternative hypothesis is they have different variances. 
+
+```{r}
+var.test(Weight~MomSmoke, data = birthweight)
+```
+
+The large p-value of 0.8009 fails to reject the null hypothesis and we can conclude that the two groups have equal variance. Thus, we should proceed with a pooled t-test which assumes equal variance and normal distribution. 
+
+For this test, our null hypothesis is that the average infant weight of non-smoking moms is equal to the average infant weight of smoking moms.
+
+Our alternative hypothesis is that the average infant weight of non-smoking moms is greater than the average infant weight of smoking moms or average infant weight of non-smoking moms is less than the average infant weight of smoking moms or the average infant weight of non-smoking moms is not equal to the average infant weight of smoking moms. 
+
+```{r}
+t.test(birthweight$Weight[birthweight$MomSmoke == 0], birthweight$Weight[birthweight$MomSmoke == 1], var.equal = T, alternative = "two.sided")
+```
+
+Our two sample t-test yielded a small p-value of 0.002334 so we can reject the null hypothesis that the average infant weight of non-smoking moms is equal to the average infant weight of smoking moms. In conclusion, the average infant weight of non-smoking moms is greater than the average infant weight of smoking moms or average infant weight of non-smoking moms is less than the average infant weight of smoking moms or the average infant weight of non-smoking moms is not equal to the average infant weight of smoking moms. 
+
+##Problem 3
+
+Now perform one-way ANOVA on Weight with MomSmoke.
+
+a. Check homogeneity of variance (equal variance) assumption. Does it hold and okay to perform ANOVA?
+
+```{r}
+birthweight$MomSmoke = as.factor(birthweight$MomSmoke)
+aov_res = aov(Weight~MomSmoke, data = birthweight)
+leveneTest(aov_res)
+summary(aov_res)
+```
+
+The Levene's Test yields a large p-value (0.4114) that indicates the variances are equal for different MomSmoke groups. 
+
+b. Make a conclusion on the effect of MomSmoke. Compare your result with the conclusion of Problem 2.
+
+The test yields a p-value (0.00233) < .05 indicating that there is a significant difference in Weight between different MomSmoke groups. The results are the same as the two sample t-test we ran in problem 2. Even the p-values were identical. MomSmoke does have a significant effect of infant birthweight. 
+
+##Problem 4
+
+Using **Black**, **Married**, **Boy**, **MomSmoke**, and **Ed** variables as possible effects, find the best ANOVA model for **Weight**. Manually perform backward selection based on type3 SS result with 0.05 criteria on the p-value. Perform backward selection only with main effects and then check the interaction effects only based on significant main effect terms.
+
+NOTE: For backward selection, you remove a variable from the least significant one, ONE BY ONE, until there is no more variable with a p-value larger than the criteria.
+
+
+a. Write down step by step how you perform backward selection and how you find the final model. Please do NOT include all intermediate tables and graphs in the report. Just describe each step which variable you delete and why.
+
+First, we start with a model that includes all the variables of interest (**Black**, **Married**, **Boy**, **MomSmoke**, and **Ed**) and run a type 3 SS. Because there are numerous variables with p-values above the threshold (.05), we must remove the least significant one and run the test again. In this case, the Ed variable had the least significance with a p-value of roughly 0.86. Running the test without the Ed variable still yielded a couple variables with p-values above the threshold (.05). Thus, we must remove the least significant one (Married) and run the test again. We repeat this process until there are no variables, with p-values above our threshold, left in our model. Afterwards, we are left with a model that includes just the Black and MomSmoke variables. Our next step is to determine if they have a significant interaction. The interaction term has a p-value of roughly 0.88 suggesting that the interaction between Black and MomSmoke does not have a significant effect on Weight. In conclusion, the best model includes Black and MomSmoke variables and no interaction. See below. 
+
+```{r}
+weight_aov = aov(Weight ~ Black + MomSmoke, data = birthweight)
+Anova(weight_aov, type = '3')
+```
+
+b. Specify the final model and report the amount of variation explained by the model. Also, check the Normality assumption through diagnostics plots.
+
+Here is the final model.
+```{r}
+birthweight$MomSmoke = as.factor(birthweight$MomSmoke)
+birthweight$Black = as.factor(birthweight$Black)
+weight_aov = aov(Weight ~ Black + MomSmoke, data = birthweight)
+Anova(weight_aov, type = '3')
+```
+
+Amount of variation explained by the model
+```{r}
+summary(lm(Weight ~ Black + MomSmoke, data = birthweight))$adj.r.squared
+```
+By calculating the adj R-Squared we can conclude that roughly 7.2% of the variation in weight is explained by the model.
+
+Check the Normality Assumption
+Q-Q Plots
+```{r}
+qqnorm(birthweight$Weight)
+qqline(birthweight$Weight, col = "red")
+
+qqnorm(birthweight$Weight[birthweight$Black == 0])
+qqline(birthweight$Weight[birthweight$Black == 0], col = "red")
+
+qqnorm(birthweight$Weight[birthweight$Black == 1])
+qqline(birthweight$Weight[birthweight$Black == 1], col = "red")
+
+qqnorm(birthweight$Weight[birthweight$MomSmoke == 0])
+qqline(birthweight$Weight[birthweight$MomSmoke == 0], col = "red")
+
+qqnorm(birthweight$Weight[birthweight$MomSmoke == 1])
+qqline(birthweight$Weight[birthweight$MomSmoke == 1], col = "red")
+```
+Shapiro
+```{r}
+shapiro.test(birthweight$Weight)
+shapiro.test(birthweight$Weight[birthweight$Black == 0])
+shapiro.test(birthweight$Weight[birthweight$Black == 1])
+shapiro.test(birthweight$Weight[birthweight$MomSmoke == 0])
+shapiro.test(birthweight$Weight[birthweight$MomSmoke == 1])
+```
+
+The Q-Q Plots and Shapiro Tests show the data is normally distributed for all groups in our final model. 
+
+c. State conclusions about significant differences in Weight across groups. For each significant variable, describe which level has a larger or smaller mean value of Weight.
+
+```{r}
+ScheffeTest(weight_aov)
+```
+
+The Scheffe Test tells us white infants have a larger mean weight than that of black infants. Additionally, infants of non-smoking moms have a larger mean weight than infants of smoking moms. Specifically, the average white infant is approximately 294g heavier than the average black infant and the average infant of non-smoking moms is approximately 267g heavier than the average infant of smoking moms. 
+
